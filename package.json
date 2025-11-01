@@ -1,14 +1,24 @@
 {
-  "name": "geo-locator-ai-vercel",
-  "version": "1.0.0",
+  "name": "geo-locator-ai",
   "private": true,
-  "description": "Geo-Locator AI with a secure Vercel backend.",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
-    "@google/genai": "^1.28.0"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "lucide-react": "^0.552.0",
+    "@google/genai": "^1.28.0",
+    "@vercel/node": "^5.5.3"
   },
   "devDependencies": {
-    "@types/node": "^20.12.12",
-    "@vercel/node": "^3.1.5",
-    "typescript": "^5.4.5"
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }

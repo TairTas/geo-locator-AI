@@ -1,8 +1,0 @@
-
-{
-  "functions": {
-    "api/gemini.ts": {
-      "memory": 1024
-    }
-  }
-}
