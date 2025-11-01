@@ -1,12 +1,8 @@
-
 {
   "name": "geo-locator-ai-vercel",
   "version": "1.0.0",
   "private": true,
   "description": "Geo-Locator AI with a secure Vercel backend.",
-  "scripts": {
-    "build": "echo 'No build step required for frontend. Vercel handles API routes automatically.'"
-  },
   "dependencies": {
     "@google/genai": "^1.28.0"
   },
