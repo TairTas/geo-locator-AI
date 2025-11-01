@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { analyzeMedia, generateAudio } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
@@ -7,10 +6,15 @@ import useIsMobile from './hooks/useIsMobile';
 import FileUpload from './components/FileUpload';
 import ResultCard from './components/ResultCard';
 import Loader from './components/Loader';
+import ApiKeyModal from './components/ApiKeyModal';
 import { AnalysisResult, GeolocationCoordinates, Language } from './types';
-import { Languages, ArrowLeft } from 'lucide-react';
+import { Languages, ArrowLeft, KeyRound } from 'lucide-react';
+
+const API_KEY_STORAGE_KEY = 'gemini-api-key';
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [ttsLanguage, setTtsLanguage] = useState<Language>('en');
@@ -29,11 +33,25 @@ const App: React.FC = () => {
   const progressIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (savedKey) {
+      setApiKey(savedKey);
+    } else {
+      setShowApiKeyModal(true);
+    }
+  }, []);
+
+  useEffect(() => {
     if (geoError) {
       console.warn("Geolocation error:", geoError);
-      // Non-blocking error
     }
   }, [geoError]);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem(API_KEY_STORAGE_KEY, key);
+    setShowApiKeyModal(false);
+  };
 
   const resetState = () => {
     setFile(null);
@@ -66,24 +84,37 @@ const App: React.FC = () => {
   };
 
   const handleAnalyzeClick = useCallback(async () => {
+    if (!apiKey) {
+      setShowApiKeyModal(true);
+      setError('Please set your Gemini API key first.');
+      return;
+    }
     if (!file) {
       setError('Please upload a file first.');
       return;
     }
     
-    resetState();
+    // Clear previous results and errors before starting a new analysis
+    setAnalysisResult(null);
+    setAudioData(null);
+    setError(null);
+    setAudioError(null);
+    setAnalysisProgress(0);
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+
     setIsLoading(true);
     setLoadingMessage('Analyzing media...');
     if(isMobile) setMobileView('result');
 
-    // Simulate analysis progress
     progressIntervalRef.current = window.setInterval(() => {
         setAnalysisProgress(prev => Math.min(prev + 5, 90));
     }, 500);
 
     try {
       const { base64, mimeType } = await fileToBase64(file);
-      const result = await analyzeMedia(base64, mimeType, coordinates as GeolocationCoordinates);
+      const result = await analyzeMedia(apiKey, base64, mimeType, coordinates as GeolocationCoordinates);
       
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
       setAnalysisProgress(100);
@@ -93,7 +124,7 @@ const App: React.FC = () => {
       setIsGeneratingAudio(true);
       try {
         const textToSpeak = ttsLanguage === 'en' ? result.en : result.ru;
-        const audio = await generateAudio(textToSpeak);
+        const audio = await generateAudio(apiKey, textToSpeak);
         setAudioData(audio);
       } catch (audioErr) {
         console.error("Audio generation failed:", audioErr);
@@ -108,7 +139,7 @@ const App: React.FC = () => {
       setError(analysisErr instanceof Error ? analysisErr.message : 'An unknown error occurred during analysis.');
       setIsLoading(false);
     }
-  }, [file, coordinates, ttsLanguage, isMobile]);
+  }, [file, apiKey, coordinates, ttsLanguage, isMobile]);
 
   const uploadSection = (
       <div className="flex flex-col gap-6">
@@ -156,8 +187,17 @@ const App: React.FC = () => {
           {isLoading ? (
             <Loader message={loadingMessage} progress={analysisProgress} />
           ) : error ? (
-            <div className="flex items-center justify-center h-full bg-red-900/20 border border-red-500/50 rounded-lg p-4">
-              <p className="text-center text-red-400">{error}</p>
+            <div className="flex flex-col items-center justify-center h-full bg-red-900/20 border border-red-500/50 rounded-lg p-4 text-center">
+              <p className="text-red-400">{error}</p>
+              {(error.includes("API key") || error.includes("API Key")) && (
+                 <button 
+                    onClick={() => setShowApiKeyModal(true)} 
+                    className="mt-4 bg-yellow-500 text-black font-bold py-2 px-4 rounded-lg flex items-center gap-2 hover:bg-yellow-600"
+                >
+                    <KeyRound size={18} />
+                    Update API Key
+                </button>
+              )}
             </div>
           ) : analysisResult ? (
             <ResultCard
@@ -176,29 +216,41 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center p-4 sm:p-6 lg:p-8">
-      <div className="w-full max-w-4xl mx-auto">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
-            Geo-Locator AI
-          </h1>
-          <p className="mt-2 text-lg text-gray-400">
-            Upload a photo or video to discover its location and story.
-          </p>
-        </header>
-
-        <main className="bg-gray-800/50 rounded-2xl shadow-2xl p-6 backdrop-blur-sm border border-gray-700">
-          {isMobile ? (
-            mobileView === 'upload' ? uploadSection : resultSection
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-              {uploadSection}
-              {resultSection}
+    <>
+      <ApiKeyModal isOpen={showApiKeyModal} onSave={handleSaveApiKey} />
+      <div className={`min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center p-4 sm:p-6 lg:p-8 transition-filter duration-300 ${showApiKeyModal ? 'blur-sm' : ''}`}>
+        <div className="w-full max-w-4xl mx-auto">
+          <header className="flex justify-between items-center mb-8">
+            <div className="text-left">
+              <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+                Geo-Locator AI
+              </h1>
+              <p className="mt-2 text-lg text-gray-400">
+                Upload a photo or video to discover its location and story.
+              </p>
             </div>
-          )}
-        </main>
+             <button
+                onClick={() => setShowApiKeyModal(true)}
+                className="p-2 bg-gray-700 rounded-full text-gray-300 hover:bg-gray-600 hover:text-white transition"
+                aria-label="Update API Key"
+              >
+                <KeyRound size={20} />
+              </button>
+          </header>
+
+          <main className="bg-gray-800/50 rounded-2xl shadow-2xl p-6 backdrop-blur-sm border border-gray-700">
+            {isMobile ? (
+              mobileView === 'upload' ? uploadSection : resultSection
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                {uploadSection}
+                {resultSection}
+              </div>
+            )}
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
