@@ -1,0 +1,7 @@
+{
+  "name": "Geo-Locator AI",
+  "description": "Upload a photo or video to have AI identify the location, provide details and reviews in English or Russian, and generate an audio summary. Powered by Gemini, this app uses image/video analysis and grounding with Google Maps and Search.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
